@@ -45,6 +45,94 @@ def run_query(sql, params=None, fetch=True):
         st.error(f"資料庫錯誤：{type(e).__name__}: {e}")
         st.stop()
 
+# ── 自動建表（若資料表不存在則建立並插入測試資料）────────────────
+def setup_db():
+    ddl_statements = [
+        """
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user' AND xtype='U')
+        BEGIN
+            CREATE TABLE [user] (
+                user_id   NVARCHAR(20)  NOT NULL PRIMARY KEY,
+                user_name NVARCHAR(50)  NOT NULL,
+                password  NVARCHAR(50)  NOT NULL
+            )
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM [user])
+        BEGIN
+            INSERT INTO [user] (user_id, user_name, password) VALUES ('admin',  N'系統管理員', 'admin123')
+            INSERT INTO [user] (user_id, user_name, password) VALUES ('user01', N'測試用戶一', 'pass001')
+            INSERT INTO [user] (user_id, user_name, password) VALUES ('user02', N'測試用戶二', 'pass002')
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='cust' AND xtype='U')
+        BEGIN
+            CREATE TABLE cust (
+                cust_id   NVARCHAR(20)  NOT NULL PRIMARY KEY,
+                cust_name NVARCHAR(100) NOT NULL,
+                remark    NVARCHAR(255) NULL
+            )
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM cust)
+        BEGIN
+            INSERT INTO cust (cust_id, cust_name, remark) VALUES ('C001', N'台灣科技股份有限公司', N'長期合作客戶')
+            INSERT INTO cust (cust_id, cust_name, remark) VALUES ('C002', N'全球貿易有限公司',     N'批發採購為主')
+            INSERT INTO cust (cust_id, cust_name, remark) VALUES ('C003', N'新興電商平台',         N'網路銷售通路')
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='fact' AND xtype='U')
+        BEGIN
+            CREATE TABLE fact (
+                fact_id   NVARCHAR(20)  NOT NULL PRIMARY KEY,
+                fact_name NVARCHAR(100) NOT NULL,
+                remark    NVARCHAR(255) NULL
+            )
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM fact)
+        BEGIN
+            INSERT INTO fact (fact_id, fact_name, remark) VALUES ('F001', N'優質供應商股份有限公司', N'電子零件供應')
+            INSERT INTO fact (fact_id, fact_name, remark) VALUES ('F002', N'東方製造廠',             N'機械零件製造')
+            INSERT INTO fact (fact_id, fact_name, remark) VALUES ('F003', N'綠能科技廠商',           N'環保材料供應')
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='item' AND xtype='U')
+        BEGIN
+            CREATE TABLE item (
+                item_id   NVARCHAR(20)  NOT NULL PRIMARY KEY,
+                item_name NVARCHAR(100) NOT NULL,
+                fact_code NVARCHAR(20)  NULL,
+                CONSTRAINT FK_item_fact FOREIGN KEY (fact_code) REFERENCES fact(fact_id)
+            )
+        END
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM item)
+        BEGIN
+            INSERT INTO item (item_id, item_name, fact_code) VALUES ('I001', N'高效能處理器', 'F001')
+            INSERT INTO item (item_id, item_name, fact_code) VALUES ('I002', N'精密齒輪組件', 'F002')
+            INSERT INTO item (item_id, item_name, fact_code) VALUES ('I003', N'太陽能電池板', 'F003')
+        END
+        """,
+    ]
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        for stmt in ddl_statements:
+            cur.execute(stmt)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"建立資料表失敗：{e}")
+        st.stop()
+
 # ── Session state 初始化 ──────────────────────────────────────
 for key, val in {"page": "login", "user": None, "mode": None, "edit_row": None}.items():
     if key not in st.session_state:
@@ -341,6 +429,9 @@ def page_item():
                         st.success("刪除成功"); go("item"); st.rerun()
                     except Exception as e:
                         st.error(f"刪除失敗：{e}")
+
+# ── 啟動時自動建表 ────────────────────────────────────────────
+setup_db()
 
 # ── 路由 ──────────────────────────────────────────────────────
 page = st.session_state.page
