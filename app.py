@@ -31,15 +31,19 @@ def get_conn():
     )
 
 def run_query(sql, params=None, fetch=True):
-    conn = get_conn()
-    cur = conn.cursor(as_dict=True)
-    cur.execute(sql, params or ())
-    if fetch:
-        rows = cur.fetchall()
+    try:
+        conn = get_conn()
+        cur = conn.cursor(as_dict=True)
+        cur.execute(sql, params or ())
+        if fetch:
+            rows = cur.fetchall()
+            conn.close()
+            return rows
+        conn.commit()
         conn.close()
-        return rows
-    conn.commit()
-    conn.close()
+    except Exception as e:
+        st.error(f"資料庫錯誤：{type(e).__name__}: {e}")
+        st.stop()
 
 # ── Session state 初始化 ──────────────────────────────────────
 for key, val in {"page": "login", "user": None, "mode": None, "edit_row": None}.items():
