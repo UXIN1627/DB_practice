@@ -6,6 +6,20 @@ st.set_page_config(page_title="資料維護系統", page_icon="🗂️", layout=
 
 # ── 資料庫連線 ────────────────────────────────────────────────
 def get_conn():
+    if "db" not in st.secrets:
+        st.error(
+            "⚠️ 找不到資料庫連線設定。\n\n"
+            "請在 Streamlit Cloud → Manage app → Secrets 加入：\n\n"
+            "```toml\n"
+            "[db]\n"
+            "server   = \"your_server_ip\"\n"
+            "port     = 8000\n"
+            "database = \"your_database\"\n"
+            "user     = \"your_user\"\n"
+            "password = \"your_password\"\n"
+            "```"
+        )
+        st.stop()
     s = st.secrets["db"]
     return pymssql.connect(
         server=s["server"],
